@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 
 namespace mvprofile
 {
-    class RegistryUtils
+    public static class RegistryUtils
     {
-        public static void IterateKeys(RegistryKey root, Func<RegistryKey, bool> filter, Action<RegistryKey> processor)
+        public static void IterateKeys(this RegistryKey root, Action<RegistryKey> action)
         {
             if (root == null)
             {
@@ -23,27 +23,24 @@ namespace mvprofile
                 {
                     using (RegistryKey key = root.OpenSubKey(keyname, true))
                     {
-                        IterateKeys(key, filter, processor);
-
-                        if (filter(key))
-                        {
-                            processor(key);
-                        }
+                        key.IterateKeys(action);
                     }
                 }
                 catch (Exception e)
                 {
                 }
             });
+
+            action(root);
         }
 
-        public static void RenameValue(RegistryKey key, string oldName, string newName)
+        public static void RenameValue(this RegistryKey key, string oldName, string newName)
         {
             key.SetValue(newName, key.GetValue(oldName), key.GetValueKind(oldName));
             key.DeleteValue(oldName);
         }
 
-        public static void RenameSubKey(RegistryKey root, string oldName, string newName)
+        public static void RenameSubKey(this RegistryKey root, string oldName, string newName)
         {
             using (RegistryKey subKey = root.OpenSubKey(oldName))
             {
@@ -71,12 +68,27 @@ namespace mvprofile
                     }
                 }
             }
-
         }
 
-        [DllImport("advapi32.dll")]
-        public static extern int RegLoadKey(IntPtr hkey, string lpSubKey, string lpFile);
+        /// <summary>
+        /// Load a registry hive file under HKEY_USERS
+        /// </summary>
+        /// <param name="hiveFilePath">The path to the registry hive file to load</param>
+        /// <param name="subKeyName">The name of the subkey of HKEY_CURRENT_USER to load the hive under</param>
+        /// <returns>0 on success, an error code on failure as defined by RegLoadKey in the Windows APIs</returns>
+        public static int LoadUserHive(string hiveFilePath, string subKeyName)
+        {
+            return NativeMethods.Registry.RegLoadKey(NativeMethods.Registry.HKEY_USERS, subKeyName, hiveFilePath);
+        }
 
-        internal static readonly IntPtr HKEY_USERS = new IntPtr(unchecked((int)0x80000003));
+        /// <summary>
+        /// Unload a registry hive file under HKEY_USERS
+        /// </summary>
+        /// <param name="subKeyName">The name of the subkey of HKEY_CURRENT_USER to unload</param>
+        /// <returns>0 on success, an error code on failure as defined by RegUnLoadKey in the Windows APIs</returns>
+        public static int UnloadUserHive(string subKeyName)
+        {
+            return NativeMethods.Registry.RegUnLoadKey(NativeMethods.Registry.HKEY_USERS, subKeyName);
+        }
     }
 }
